@@ -68,7 +68,7 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 
 /* arena */
 .stage { background: var(--arena); border-radius: 16px; overflow: hidden; }
-.viewport { position: relative; aspect-ratio: 16 / 8.6; max-width: 100%; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.viewport { position: relative; aspect-ratio: 16 / 8.6; max-width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
 .viewport canvas { display: block; width: 100%; height: 100%; cursor: grab; }
 .viewport canvas:active { cursor: grabbing; }
 .hud { position: absolute; color: var(--hud-ink); font-size: 12px; }
@@ -3963,7 +3963,7 @@ if (ok3d) {
     const [px, py] = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
     if (ptrs.size === 1) {
       camGoal.theta -= (e.clientX - px) * 0.008;
-      if (e.pointerType !== 'touch') camGoal.phi = THREE.MathUtils.clamp(camGoal.phi - (e.clientY - py) * 0.006, 0.05, 1.5);
+      camGoal.phi = THREE.MathUtils.clamp(camGoal.phi - (e.clientY - py) * 0.006, 0.05, 1.5);
       userCam = true;
       Object.assign(cam, { theta: camGoal.theta, phi: camGoal.phi });
       document.querySelectorAll('#views .ctrl').forEach(b => b.setAttribute('aria-pressed', 'false'));
