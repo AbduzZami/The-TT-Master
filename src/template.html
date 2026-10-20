@@ -1,0 +1,871 @@
+<title>The TT Master</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: curriculum rail on the left, a live 3D arena on top, the lesson card underneath. */
+:root {
+  --bg: #eef2f7; --panel: #ffffff; --ink: #0d1a2b; --muted: #566377; --line: #d6dde8;
+  --blue: #1b4f93; --ball: #f06a14; --ok: #1f8a5b; --chip: #e2e8f1;
+  --f-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* the arena keeps one venue look in both themes */
+  --arena: #0a1422; --hud: rgba(8, 16, 28, .72); --hud-ink: #eaf1fb; --hud-muted: #93a3b8; --hud-line: rgba(255,255,255,.14);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0b111b; --panel: #121a27; --ink: #e6ecf4; --muted: #95a3b6; --line: #243146;
+  --blue: #6ea2ec; --ball: #ff8a3d; --ok: #4cc58c; --chip: #1b2636; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0b111b; --panel: #121a27; --ink: #e6ecf4; --muted: #95a3b6; --line: #243146;
+  --blue: #6ea2ec; --ball: #ff8a3d; --ok: #4cc58c; --chip: #1b2636; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--f-body); -webkit-font-smoothing: antialiased; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ball); outline-offset: 2px; }
+
+.wrap { max-width: 1380px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 48px; }
+
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 16px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { width: 38px; height: 38px; border-radius: 50%; background: var(--ball); position: relative; flex: none; box-shadow: inset -6px -6px 0 rgba(0,0,0,.12); }
+.brand-mark::after { content: ""; position: absolute; inset: 9px 16px; border-radius: 3px; background: rgba(255,255,255,.55); transform: rotate(-24deg); }
+.brand h1 { margin: 0; font: 900 30px/1 var(--f-display); letter-spacing: .01em; text-transform: uppercase; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.progress { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.ladder { display: flex; gap: 3px; }
+.ladder span { width: 18px; height: 8px; border-radius: 2px; background: var(--chip); }
+.ladder span.done { background: var(--ok); }
+.progress b { color: var(--ink); font-family: var(--f-mono); font-weight: 700; }
+
+.layout { display: grid; grid-template-columns: 286px minmax(0, 1fr); gap: 20px; align-items: start; }
+
+/* curriculum rail */
+.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px; max-height: calc(100vh - 24px); overflow: auto; }
+.rail summary { display: none; }
+.level { padding: 10px 8px 6px; }
+.level-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.level-num { font: 800 13px/1 var(--f-mono); color: var(--ball); }
+.level-name { font: 800 20px/1 var(--f-display); text-transform: uppercase; letter-spacing: .02em; }
+.level-tag { margin-left: auto; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.lesson-btn { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 8px 8px; border-radius: 8px; font-size: 14.5px; color: var(--ink); }
+.lesson-btn:hover { background: var(--chip); }
+.lesson-btn[aria-current="true"] { background: var(--ink); color: var(--bg); }
+.tick { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--line); flex: none; display: grid; place-items: center; }
+.lesson-btn[aria-current="true"] .tick { border-color: currentColor; }
+.tick.done { background: var(--ok); border-color: var(--ok); }
+.tick.done::after { content: ""; width: 7px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+
+/* arena */
+.stage { background: var(--arena); border-radius: 16px; overflow: hidden; }
+.viewport { position: relative; aspect-ratio: 16 / 8.6; max-width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+.viewport canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.viewport canvas:active { cursor: grabbing; }
+.hud { position: absolute; color: var(--hud-ink); font-size: 12px; }
+.glass { background: var(--hud); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--hud-line); border-radius: 10px; }
+.readout { top: 12px; left: 12px; display: grid; grid-template-columns: repeat(4, auto); gap: 0; }
+.readout div { padding: 7px 12px; border-right: 1px solid var(--hud-line); }
+.readout div:last-child { border-right: 0; }
+.readout small { display: block; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--hud-muted); }
+.readout b { font: 700 17px/1.2 var(--f-mono); font-variant-numeric: tabular-nums; }
+.readout b em { font-style: normal; font-size: 11px; color: var(--hud-muted); margin-left: 3px; font-weight: 500; }
+.legend { top: 12px; right: 12px; padding: 8px 10px; display: grid; gap: 4px; max-width: 46%; }
+.legend span { display: flex; align-items: center; gap: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.legend i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.caption { left: 50%; bottom: 12px; transform: translateX(-50%); padding: 6px 14px; font-weight: 600; font-size: 13px; white-space: nowrap; transition: opacity .25s; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; }
+.tag3d { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); font: 600 11px/1 var(--f-body); color: #fff; background: rgba(8,16,28,.62); border: 1px solid rgba(255,255,255,.22); padding: 4px 7px; border-radius: 5px; white-space: nowrap; pointer-events: none; }
+.spin-tag { font: 600 10.5px/1 var(--f-mono); background: rgba(8,16,28,.78); border-left-width: 3px; }
+.note { position: absolute; left: 12px; top: 66px; font-size: 10.5px; color: var(--hud-muted); }
+
+.controls { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--hud-line); flex-wrap: wrap; color: var(--hud-ink); }
+.ctrl { border: 0; background: transparent; color: var(--hud-ink); height: 32px; min-width: 32px; padding: 0 9px; border-radius: 7px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.ctrl:hover { background: rgba(255,255,255,.1); }
+.ctrl[aria-pressed="true"] { background: rgba(255,255,255,.18); }
+.play { background: var(--ball); color: #1a0d03; width: 36px; }
+.play:hover { background: var(--ball); filter: brightness(1.08); }
+.scrub { flex: 1; min-width: 60px; accent-color: #ff8a3d; }
+.seg { display: inline-flex; border: 1px solid var(--hud-line); border-radius: 8px; padding: 2px; }
+.seg .ctrl { height: 26px; padding: 0 8px; font-size: 11.5px; }
+.ctrl-group { display: inline-flex; gap: 4px; align-items: center; }
+.time { font: 500 11.5px var(--f-mono); color: var(--hud-muted); font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
+.fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--hud-muted); padding: 24px; text-align: center; }
+
+/* lesson card */
+.lesson { margin-top: 20px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px 36px; }
+.eyebrow { font: 700 12px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ball); }
+.lesson h2 { font: 900 clamp(34px, 5vw, 54px)/0.95 var(--f-display); text-transform: uppercase; margin: 10px 0 12px; text-wrap: balance; letter-spacing: .005em; }
+.lede { font-size: 18px; color: var(--muted); margin: 0 0 18px; max-width: 58ch; text-wrap: pretty; }
+.nav-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--panel); padding: 9px 14px; border-radius: 9px; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.learned { background: var(--ok); color: #fff; border-color: var(--ok); }
+.btn:disabled { opacity: .4; cursor: default; }
+
+.points { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.points li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.points dt, .points .k { font: 800 17px/1.25 var(--f-display); text-transform: uppercase; letter-spacing: .02em; }
+.points .v { color: var(--ink); font-size: 15px; }
+.mistake { margin-top: 18px; padding: 14px 16px; border-radius: 12px; background: color-mix(in srgb, var(--ball) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--ball) 35%, var(--line)); font-size: 15px; }
+.drill { margin-top: 12px; padding: 14px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 15px; }
+.drill b { display: block; font: 700 11px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ok); margin-bottom: 6px; }
+.diff { display: inline-flex; gap: 3px; vertical-align: 1px; margin-left: 6px; }
+.diff i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.diff i.on { background: var(--ball); }
+.mistake b { display: block; font: 700 11px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ball); margin-bottom: 6px; }
+
+/* scoreboard */
+.board { margin-top: 18px; background: #0b1625; color: #f1f5fb; border-radius: 14px; padding: 14px; }
+.board-head { display: flex; justify-content: space-between; align-items: center; font: 700 11px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: #8fa1b8; margin-bottom: 10px; }
+.board-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 4px; border-top: 1px solid rgba(255,255,255,.08); }
+.serve-dot { width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 1.5px solid #3b4d66; }
+.serve-dot.on { background: #ff8a3d; border-color: #ff8a3d; }
+.pname { font-weight: 600; }
+.pts { font: 900 34px/1 var(--f-display); font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+.board button.add { border: 0; background: #1d2d44; color: #f1f5fb; border-radius: 8px; padding: 8px 12px; font-weight: 700; }
+.board button.add:hover { background: #2a3d5a; }
+.board-msg { margin-top: 10px; font-size: 13.5px; color: #c9d5e4; min-height: 20px; }
+.board .reset { background: none; border: 1px solid #2c3e57; color: #c9d5e4; border-radius: 7px; padding: 4px 10px; font-size: 11px; }
+
+.credit { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.credit a { color: inherit; }
+@media (max-width: 1040px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .rail { position: static; max-height: none; padding: 0; }
+  .rail summary { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; list-style: none; font-weight: 600; }
+  .rail summary::-webkit-details-marker { display: none; }
+  .rail summary .sum-k { font: 700 11px var(--f-mono); color: var(--ball); text-transform: uppercase; letter-spacing: .08em; }
+  .rail summary::after { content: "Lessons"; margin-left: auto; font-size: 12px; color: var(--muted); border: 1px solid var(--line); padding: 3px 8px; border-radius: 6px; }
+  .rail .levels { padding: 0 8px 8px; }
+  .lesson { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .viewport { aspect-ratio: 1 / 1.05; }
+  .readout b { font-size: 14px; }
+  .readout div { padding: 6px 8px; }
+  .legend { top: auto; bottom: 10px; left: 10px; right: auto; max-width: calc(100% - 20px); font-size: 11px; }
+  .caption { top: 64px; bottom: auto; font-size: 12px; }
+  .note { display: none; }
+  .scrub { order: 5; flex-basis: 100%; }
+  .progress .ladder { display: none; }
+  .points li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .brand h1 { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) { .caption { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div>
+        <h1>The TT Master</h1>
+        <p>38 lessons, from the first serve to pro-level tricks</p>
+      </div>
+    </div>
+    <div class="progress" aria-live="polite">
+      <div class="ladder" id="ladder"></div>
+      <span><b id="doneCount">0</b> of <b id="totalCount">0</b> learned</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <details class="rail" id="rail" open>
+      <summary><span class="sum-k" id="sumLevel"></span><span id="sumTitle"></span></summary>
+      <nav class="levels" id="levels" aria-label="Curriculum"></nav>
+    </details>
+
+    <main>
+      <div class="stage">
+        <div class="viewport" id="stage">
+        <div class="hud glass readout" id="readout">
+          <div><small>Speed</small><b id="rSpeed">0<em>km/h</em></b></div>
+          <div><small>Spin</small><b id="rSpin">0<em>rpm</em></b></div>
+          <div><small>Height</small><b id="rHeight">0<em>cm</em></b></div>
+          <div><small>Racket</small><b id="rRacket">0<em>km/h</em></b></div>
+        </div>
+        <div class="hud glass legend" id="legend"></div>
+        <div class="hud glass caption" id="caption">Drag to orbit</div>
+        <div class="hud note">Yellow ring turns the way the ball spins · ball 1.75× size · spin slowed 14×</div>
+        <div id="tags"></div>
+        </div>
+        <div class="controls" role="toolbar" aria-label="Animation controls">
+          <button class="ctrl play" id="play" aria-label="Pause">❚❚</button>
+          <input class="scrub" id="scrub" type="range" min="0" max="1000" value="0" aria-label="Timeline">
+          <span class="time" id="time">0.00s</span>
+          <div class="seg" id="speeds" aria-label="Playback speed">
+            <button class="ctrl" data-speed="0.15">0.15×</button>
+            <button class="ctrl" data-speed="0.4" aria-pressed="true">0.4×</button>
+            <button class="ctrl" data-speed="1">1×</button>
+          </div>
+          <div class="seg" id="views" aria-label="Camera">
+            <button class="ctrl" data-view="broadcast">Player</button>
+            <button class="ctrl" data-view="side">Side</button>
+            <button class="ctrl" data-view="top">Top</button>
+            <button class="ctrl" data-view="receiver">Receiver</button>
+          </div>
+          <button class="ctrl" id="axisBtn" aria-pressed="true" title="Show which way each ball spins and name the spin">Spin view</button>
+        </div>
+      </div>
+
+      <article class="lesson" id="lesson">
+        <div>
+          <div class="eyebrow" id="lEyebrow"></div>
+          <h2 id="lTitle"></h2>
+          <p class="lede" id="lLede"></p>
+          <div class="nav-row">
+            <button class="btn" id="prevBtn">← Previous</button>
+            <button class="btn" id="learnBtn">Mark as learned</button>
+            <button class="btn primary" id="nextBtn">Next lesson →</button>
+          </div>
+          <div class="mistake" id="lMistake"></div>
+          <div class="drill" id="lDrill"></div>
+          <div id="boardSlot"></div>
+        </div>
+        <div>
+          <ul class="points" id="lPoints"></ul>
+        </div>
+      </article>
+    </main>
+  </div>
+  <footer class="credit">Player model: <a href="https://sketchfab.com/3d-models/human-body-f022e4a3641943328b2fbfdf0f7c3e1e" target="_blank" rel="noopener">“HUMAN_BODY”</a> by vistaalienprime, licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Rigged and recoloured for this site.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/*SIM*/
+/*BUILD*/
+/*LESSONS*/
+const SOLVED = /*SOLVED*/;
+</script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+const learned = new Set(store.get('ttm-learned', []));
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- curriculum UI ---------- */
+function renderRail() {
+  const nav = $('levels'); nav.innerHTML = '';
+  LEVELS.forEach(lv => {
+    const sec = document.createElement('section'); sec.className = 'level';
+    sec.innerHTML = `<div class="level-head"><span class="level-num">L${lv.id}</span><span class="level-name">${lv.name}</span><span class="level-tag">${lv.diff}</span></div>`;
+    LESSONS.filter(l => l.level === lv.id).forEach(l => {
+      const b = document.createElement('button');
+      b.className = 'lesson-btn'; b.dataset.id = l.id;
+      b.innerHTML = `<span class="tick ${learned.has(l.id) ? 'done' : ''}"></span><span>${l.title}</span>`;
+      b.addEventListener('click', () => { select(l.id); if (innerWidth <= 1040) $('rail').open = false; });
+      sec.appendChild(b);
+    });
+    nav.appendChild(sec);
+  });
+  $('ladder').innerHTML = LESSONS.map(l => `<span class="${learned.has(l.id) ? 'done' : ''}"></span>`).join('');
+  $('doneCount').textContent = learned.size; $('totalCount').textContent = LESSONS.length;
+  if (current) markCurrent();
+}
+function markCurrent() {
+  document.querySelectorAll('.lesson-btn').forEach(b => b.setAttribute('aria-current', b.dataset.id === current.id));
+}
+
+/* ---------- 3D scene ---------- */
+const stage = $('stage');
+let renderer, scene, camera, ok3d = true;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  stage.prepend(renderer.domElement);
+} catch (e) {
+  ok3d = false;
+  const f = document.createElement('div'); f.className = 'fallback';
+  f.textContent = 'This browser could not start 3D graphics. The lessons below still work.';
+  stage.appendChild(f);
+}
+
+const BALL_SCALE = 1.75, SPIN_SHOW = 1 / 14;
+const world = {};
+if (ok3d) {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color('#0a1422');
+  scene.fog = new THREE.Fog('#0a1422', 9, 20);
+  camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.05, 60);
+
+  scene.add(new THREE.HemisphereLight('#dfe9ff', '#3a1a14', 0.95));
+  const key = new THREE.DirectionalLight('#ffffff', 0.85); key.position.set(-2, 6, 3); scene.add(key);
+  const fill = new THREE.DirectionalLight('#9fc2ff', 0.3); fill.position.set(3, 3, -4); scene.add(fill);
+
+  // venue floor and barriers
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 9), new THREE.MeshLambertMaterial({ color: '#6b2a22' }));
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  const court = new THREE.Mesh(new THREE.PlaneGeometry(10, 5.6), new THREE.MeshLambertMaterial({ color: '#7d3328' }));
+  court.rotation.x = -Math.PI / 2; court.position.y = 0.002; scene.add(court);
+  const barMat = new THREE.MeshLambertMaterial({ color: '#13305a' });
+  [[0, -2.8, 10, 0.06], [5, 0, 0.06, 5.6], [-5, 0, 0.06, 5.6]].forEach(([x, z, w, d]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.7, d), barMat); m.position.set(x, 0.35, z); scene.add(m);
+  });
+
+  // table
+  const top = new THREE.Mesh(new THREE.BoxGeometry(2.74, 0.03, 1.525), new THREE.MeshLambertMaterial({ color: '#1b4f93' }));
+  top.position.y = 0.745; scene.add(top);
+  const white = new THREE.MeshBasicMaterial({ color: '#f4f7fb' });
+  const line = (w, d, x, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.002, d), white); m.position.set(x, 0.7605, z); scene.add(m); };
+  line(2.74, 0.02, 0, 0.7525); line(2.74, 0.02, 0, -0.7525); line(0.02, 1.525, 1.36, 0); line(0.02, 1.525, -1.36, 0); line(2.74, 0.004, 0, 0);
+  const legMat = new THREE.MeshLambertMaterial({ color: '#1a1f27' });
+  [[1.1, 0.6], [1.1, -0.6], [-1.1, 0.6], [-1.1, -0.6], [0.15, 0.6], [-0.15, 0.6], [0.15, -0.6], [-0.15, -0.6]].forEach(([x, z]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.73, 0.05), legMat); m.position.set(x, 0.365, z); scene.add(m);
+  });
+  // net
+  world.netMat = new THREE.MeshBasicMaterial({ color: '#0d1117', transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+  const net = new THREE.Mesh(new THREE.PlaneGeometry(1.83, 0.1525), world.netMat);
+  net.rotation.y = Math.PI / 2; net.position.set(0, 0.76 + 0.07625, 0); scene.add(net);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.014, 1.83), white); band.position.set(0, 0.76 + 0.1525 - 0.007, 0); scene.add(band);
+  [0.915, -0.915].forEach(z => { const p = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.16, 0.02), legMat); p.position.set(0, 0.84, z); scene.add(p); });
+
+  // ball texture: orange with two dark seams so rotation is readable
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const g = c.getContext('2d'); g.fillStyle = '#ff8a1f'; g.fillRect(0, 0, 256, 128);
+  g.fillStyle = '#2a1405'; g.fillRect(60, 0, 12, 128); g.fillRect(188, 0, 12, 128);
+  g.fillStyle = '#fff2d8'; g.fillRect(0, 58, 256, 12);
+  world.ballTex = new THREE.CanvasTexture(c);
+  world.ballGeo = new THREE.SphereGeometry(TT.R * BALL_SCALE, 28, 18);
+  world.shadowGeo = new THREE.CircleGeometry(TT.R * BALL_SCALE * 1.1, 20);
+  world.ringGeo = new THREE.RingGeometry(0.03, 0.045, 32);
+  world.lesson = new THREE.Group(); scene.add(world.lesson);
+}
+
+function makePaddle(rubber) {
+  const g = new THREE.Group();
+  const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.006, 32), new THREE.MeshLambertMaterial({ color: rubber }));
+  blade.scale.z = 1.08; blade.rotation.x = Math.PI / 2; blade.position.z = 0.003;
+  const back = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.006, 32), new THREE.MeshLambertMaterial({ color: '#15171c' }));
+  back.scale.z = 1.08; back.rotation.x = Math.PI / 2; back.position.z = -0.003;
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.1, 0.022), new THREE.MeshLambertMaterial({ color: '#c7a271' }));
+  handle.position.y = -0.12;
+  g.add(blade, back, handle);
+  return g; // local +z is the red face normal, +y points to the blade tip
+}
+
+
+/* ---------- racket swings ----------
+   Each stroke has a profile in the hitter's own frame: f = where the ball is sent, u = up, s = forehand side.
+   The swing direction at contact comes from the spin the shot needs (brush up for topspin, under for
+   backspin, across for sidespin) and the face angle is tilted against that brush, like a real stroke. */
+const SWINGS = {
+  serve:   { L: 0.17, wrap: 0,    bow: 0.03, Tf: 0.09, fwd: 0.6,  hand: 1,  tip0: [0, -0.85, 0.35], tip1: [0.2, -0.55, 0.5] },
+  push:    { L: 0.13, wrap: 0,    bow: 0.02, Tf: 0.13, fwd: 1,    hand: -1, tip0: [0.2, 0.4, 0.7],   tip1: [0.3, 0.3, 0.7] },
+  block:   { L: 0.06, wrap: 0,    bow: 0,    Tf: 0.08, fwd: 1,    hand: -1, tip0: [0, 0.45, 0.8],    tip1: [0.1, 0.45, 0.8] },
+  drive:   { L: 0.30, wrap: 0.12, bow: 0.08, Tf: 0.13, fwd: 1,    hand: 1,  tip0: [0, -0.15, 1],     tip1: [0.15, 0.25, 0.9] },
+  loop:    { L: 0.42, wrap: 0.16, bow: 0.12, Tf: 0.11, fwd: 0.6,  hand: 1,  tip0: [0, -0.45, 1],     tip1: [0.2, 0.4, 0.8] },
+  counter: { L: 0.52, wrap: 0.2,  bow: 0.15, Tf: 0.12, fwd: 0.75, hand: 1,  tip0: [0, -0.3, 1],      tip1: [0.2, 0.45, 0.8] },
+  chop:    { L: 0.42, wrap: 0.06, bow: 0.10, Tf: 0.15, fwd: 0.45, hand: 1,  tip0: [0.3, 0.6, 0.6],   tip1: [0.4, 0.1, 0.8] },
+  flick:   { L: 0.20, wrap: 0.1,  bow: 0.03, Tf: 0.09, fwd: 0.8,  hand: -1, tip0: [0.1, -1, 0.2],    tip1: [0.4, 0.45, 0.8], sideSign: -1 },
+  smash:   { L: 0.50, wrap: 0.18, bow: 0.10, Tf: 0.09, fwd: 1,    hand: 1,  tip0: [0.2, 0.7, 0.7],   tip1: [0.3, 0.1, 0.9], dy: -0.55 },
+  lob:     { L: 0.55, wrap: 0.1,  bow: 0.12, Tf: 0.16, fwd: 0.5,  hand: 1,  tip0: [0, -0.6, 0.8],    tip1: [0.1, 0.6, 0.7], dy: 0.6 },
+  touch:   { L: 0.05, wrap: 0,    bow: 0,    Tf: 0.07, fwd: 1,    hand: 1,  tip0: [0.3, 0.3, 0.8],   tip1: [0.3, 0.3, 0.8] },
+  tomahawk:{ L: 0.17, wrap: 0,    bow: 0.03, Tf: 0.09, fwd: 0.5,  hand: 1,  tip0: [0.1, 0.95, -0.2], tip1: [0.2, 0.9, 0.25] },
+  bhserve: { L: 0.18, wrap: 0,    bow: 0.03, Tf: 0.09, fwd: 0.5,  hand: -1, tip0: [0.2, -0.1, -1],   tip1: [0.35, 0.1, -0.9] },
+};
+SWINGS.loop.sideSign = SWINGS.counter.sideSign = -1;
+function swingType(spec) {
+  if (spec.swing) return spec.swing;
+  if (spec.toss) return 'serve';
+  const top = spec.spin.top || 0;
+  if (top >= 3000) return 'loop';
+  if (top <= -2500) return 'chop';
+  if (top < 0) return 'push';
+  return 'drive';
+}
+const UP = new THREE.Vector3(0, 1, 0), clamp = THREE.MathUtils.clamp;
+function makeSwing(t) {
+  const prof = SWINGS[swingType(t.spec)];
+  const hand = t.spec.stroke ? (t.spec.stroke === 'fh' ? 1 : -1) : prof.hand;
+  const f = new THREE.Vector3(t.v0[0], 0, t.v0[2]).normalize();
+  const s = new THREE.Vector3().crossVectors(f, UP);
+  const top = t.spec.spin.top || 0, side = t.spec.spin.side || 0;
+  // Racket at contact, solved backwards from the ball it must produce:
+  // the racket's sliding (tangential) speed creates the spin, its pushing (normal) speed creates the pace,
+  // and the ball leaves between the face normal and the racket's path.
+  const vb = new THREE.Vector3(...t.v0), wv = new THREE.Vector3(...t.w0);
+  const Vt = wv.length() * TT.R / 0.9, tdir = new THREE.Vector3();
+  let n = vb.clone().normalize();
+  for (let i = 0; i < 8; i++) {
+    tdir.crossVectors(n, wv); if (tdir.lengthSq() > 1e-9) tdir.normalize(); else tdir.set(0, 0, 0);
+    n = vb.clone().addScaledVector(tdir, -0.35 * Vt).normalize();
+  }
+  const V = n.clone().multiplyScalar(Math.max(vb.dot(n) / 1.35, 0.6)).addScaledVector(tdir, Vt);
+  const D = V.clone().normalize();
+  const C0 = new THREE.Vector3(...t.from).addScaledVector(n, -(TT.R * BALL_SCALE + 0.004));
+  const vec = (a) => f.clone().multiplyScalar(a[0]).addScaledVector(UP, a[1]).addScaledVector(s, a[2]);
+  const tip0 = vec(prof.tip0), tip1 = vec(prof.tip1);
+  const S = { prof, hand, f, s, D, n, C0, V };
+  S.P = (tau, out) => out.copy(C0).addScaledVector(D, tau * prof.L).addScaledVector(s, -tau * prof.wrap * hand).addScaledVector(f, -prof.bow * tau * tau);
+  const m = new THREE.Matrix4(), x = new THREE.Vector3(), y = new THREE.Vector3(), z = new THREE.Vector3(), nt = new THREE.Vector3();
+  S.Q = (tau, out) => {
+    nt.copy(n).addScaledVector(D, -tau * 0.18).normalize();
+    y.copy(tip0).lerp(tip1, (tau + 1) / 2); y.addScaledVector(nt, -y.dot(nt)).normalize();
+    z.copy(nt).multiplyScalar(hand); // backhand strokes use the black side
+    x.crossVectors(y, z);
+    return out.setFromRotationMatrix(m.makeBasis(x, y, z));
+  };
+  S.ready = S.P(-1, new THREE.Vector3()).addScaledVector(f, -0.12).addScaledVector(UP, top < 0 ? 0.02 : 0.05);
+  S.qA = S.Q(-1, new THREE.Quaternion()); S.qB = S.Q(1, new THREE.Quaternion());
+  S.pA = S.P(-1, new THREE.Vector3()); S.pB = S.P(1, new THREE.Vector3());
+  return S;
+}
+const easeIO = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+function swingPose(S, tt, pos, quat) {
+  const Tf = S.prof.Tf;
+  if (tt <= -Tf) { // ready, then backswing
+    const b = easeIO(clamp((tt + Tf + 0.45) / 0.45, 0, 1));
+    pos.copy(S.ready).lerp(S.pA, b); quat.copy(S.qA);
+  } else if (tt <= Tf) { // forward swing, fastest at contact
+    const tau = Math.sin(Math.PI / 2 * tt / Tf);
+    S.P(tau, pos); S.Q(tau, quat);
+  } else { // follow-through, then recover to ready
+    const b = easeIO(clamp((tt - Tf - 0.12) / 0.45, 0, 1));
+    pos.copy(S.pB).lerp(S.ready, b); quat.copy(S.qB).slerp(S.qA, b);
+  }
+}
+
+
+/* ---------- players ----------
+   Two simple athletes. Their racket hand is solved with two-bone IK onto the racket handle, so the body
+   follows the exact stroke the physics needs. Feet move between stances before each shot. */
+const SKIN = '#c98f66';
+const lam = c => new THREE.MeshLambertMaterial({ color: c });
+const Y1 = new THREE.Vector3(0, 1, 0);
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _m4 = new THREE.Matrix4();
+function ik2(S, T, a, b, pole, elbow) {
+  _b.subVectors(T, S); const L = Math.max(_b.length(), 1e-4); _b.divideScalar(L);
+  const k = L > (a + b) * 0.995 ? L / ((a + b) * 0.995) : 1; a *= k; b *= k;
+  const along = (a * a - b * b + L * L) / (2 * L), h = Math.sqrt(Math.max(0, a * a - along * along));
+  _c.copy(pole).addScaledVector(_b, -pole.dot(_b));
+  if (_c.lengthSq() < 1e-6) _c.set(0, -1, 0); _c.normalize();
+  elbow.copy(S).addScaledVector(_b, along).addScaledVector(_c, h);
+}
+/* Athlete body: "HUMAN_BODY" by vistaalienprime on Sketchfab (CC BY 4.0), rigged with 17 bones and recoloured for this page. */
+const ATHLETE = /*ATHLETE*/;
+function b64arr(s, T) { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); }
+let athleteBase = null;
+function athleteGeometry() {
+  if (athleteBase) return athleteBase;
+  const m = ATHLETE, n = m.n, q = b64arr(m.pos, Int16Array), nq = b64arr(m.nrm, Int8Array);
+  const pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3);
+  for (let i = 0; i < n * 3; i++) { pos[i] = (q[i] + 32768) * m.sc[i % 3] + m.lo[i % 3]; nrm[i] = nq[i] / 127; }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setAttribute('skinIndex', new THREE.BufferAttribute(b64arr(m.si, Uint8Array), 4));
+  g.setAttribute('skinWeight', new THREE.BufferAttribute(b64arr(m.sw, Uint8Array), 4, true));
+  g.setIndex(new THREE.BufferAttribute(b64arr(m.idx, Uint16Array), 1));
+  const REST_REF = { handR: [1, 0, 0], handL: [-1, 0, 0], footR: [0, 1, 0], footL: [0, 1, 0] };
+  const rest = {};
+  m.bones.forEach((b, i) => {
+    const a = new THREE.Vector3(...b.a), d = new THREE.Vector3(...b.b).sub(a), len = d.length(); d.divideScalar(len);
+    const ref = new THREE.Vector3(...(REST_REF[b.n] || [0, 0, 1]));
+    const z = ref.addScaledVector(d, -ref.dot(d)).normalize(), x = new THREE.Vector3().crossVectors(d, z);
+    const B0T = new THREE.Matrix4().makeBasis(x, d, z).transpose();
+    rest[b.n] = { i, len, B0T, Tinv: new THREE.Matrix4().makeTranslation(-a.x, -a.y, -a.z) };
+  });
+  athleteBase = { g, reg: b64arr(m.reg, Uint8Array), rest, n };
+  return athleteBase;
+}
+function makePlayer(shirt) {
+  const A = athleteGeometry(), g = new THREE.Group();
+  const geo = new THREE.BufferGeometry();
+  for (const k of ['position', 'normal', 'skinIndex', 'skinWeight']) geo.setAttribute(k, A.g.attributes[k]);
+  geo.setIndex(A.g.index);
+  const pal = [SKIN, shirt, '#1b2230', '#f1f3f6', '#e4e7eb', '#20160f'].map(c => new THREE.Color(c));
+  const col = new Float32Array(A.n * 3);
+  for (let i = 0; i < A.n; i++) { const c = pal[A.reg[i]]; col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, skinning: true, roughness: 0.6, metalness: 0.0, transparent: true });
+  const mesh = new THREE.SkinnedMesh(geo, mat);
+  const bones = ATHLETE.bones.map(() => { const b = new THREE.Bone(); b.matrixAutoUpdate = false; return b; });
+  bones.forEach(b => mesh.add(b));
+  mesh.bind(new THREE.Skeleton(bones, bones.map(() => new THREE.Matrix4())), new THREE.Matrix4());
+  mesh.frustumCulled = false;
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.42, 24), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.22, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.scale.set(1, 0.7, 1);
+  g.add(mesh, shadow);
+  return { g, mesh, bones, rest: A.rest, mats: [mat], shadow };
+}
+const _M = new THREE.Matrix4(), _B1 = new THREE.Matrix4(), _S = new THREE.Matrix4(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _x = new THREE.Vector3();
+function setBone(P, name, a, b, ref) {
+  const R = P.rest[name];
+  _y.subVectors(b, a); const len = _y.length() || 1e-4; _y.divideScalar(len);
+  _z.copy(ref).addScaledVector(_y, -ref.dot(_y));
+  if (_z.lengthSq() < 1e-6) _z.set(0, 0, 1).addScaledVector(_y, -_y.z);
+  _z.normalize(); _x.crossVectors(_y, _z);
+  _B1.makeBasis(_x, _y, _z);
+  _S.makeScale(1, clamp(len / R.len, 0.6, 1.6), 1);
+  const bone = P.bones[R.i];
+  bone.matrix.makeTranslation(a.x, a.y, a.z).multiply(_B1).multiply(_S).multiply(R.B0T).multiply(R.Tinv);
+  bone.matrixWorldNeedsUpdate = true;
+}
+function basisQuat(q, x, y) { _d.crossVectors(x, y); return q.setFromRotationMatrix(_m4.makeBasis(x, y, _d)); }
+/*PLAYERS*/
+
+/* ---------- spin view: a ring that turns with the ball, plus a label naming the spin ---------- */
+function makeSpinGlyph() {
+  const g = new THREE.Group(), turn = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: '#ffe14d', depthTest: false, transparent: true, opacity: 0.95 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.062, 0.0055, 6, 40, Math.PI * 1.5), mat);
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.034, 12), mat);
+  head.position.set(0, -0.062, 0); head.rotation.z = -Math.PI / 2;
+  turn.add(ring, head);
+  const axis = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.2, 6), new THREE.MeshBasicMaterial({ color: '#ffffff', depthTest: false, transparent: true, opacity: 0.7 }));
+  axis.rotation.x = Math.PI / 2;
+  g.add(turn, axis); g.renderOrder = 20; turn.renderOrder = 20;
+  g.traverse(n => { n.renderOrder = 20; });
+  return { g, turn, phase: 0 };
+}
+function spinName(f) {
+  const h = Math.hypot(f.v[0], f.v[2]) || 1, d = [f.v[0] / h, 0, f.v[2] / h];
+  const topAxis = [d[2], 0, -d[0]]; // UP x d
+  const top = (f.w[0] * topAxis[0] + f.w[2] * topAxis[2]) / TT.RPM, side = f.w[1] / TT.RPM;
+  const parts = [];
+  if (Math.abs(top) > 150) parts.push(top > 0 ? 'Topspin' : 'Backspin');
+  if (Math.abs(side) > 150) parts.push('Sidespin');
+  const rpm = Math.round(Math.hypot(...f.w) / TT.RPM / 50) * 50;
+  return parts.length ? `${parts.join(' + ')} · ${rpm} rpm` : 'No spin';
+}
+
+/* ---------- lesson playback ---------- */
+const LEAD = 1.2; // seconds of set-up before the first ball moves
+let current = null, tracks = [], visuals = [], loopLen = 3, simT = -LEAD, playing = !reduced, speed = 0.4, showAxis = true;
+const cam = { theta: 0, phi: 1, r: 4, tx: 0, ty: 0.8, tz: 0 }, camGoal = { ...cam };
+const VIEWS = {
+  broadcast: [-4.0, 3.0, 1.4], side: [0.15, 1.5, 4.3], top: [0, 5.6, 0.4], receiver: [4.0, 3.0, -1.4],
+};
+function setView(name, snap) {
+  const [x, y, z] = VIEWS[name];
+  const dx = x - 0, dy = y - 0.8, dz = z - 0, r = Math.hypot(dx, dy, dz);
+  const fit = name === 'top' ? 1 : Math.max(1, (world.extent || 0) / 2.7);
+  Object.assign(camGoal, { r: r * fit, phi: Math.acos(dy / r), theta: Math.atan2(dx, dz), tx: 0, ty: 0.8, tz: 0 });
+  if (snap) Object.assign(cam, camGoal);
+  document.querySelectorAll('#views .ctrl').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === name));
+}
+
+function clearLesson() {
+  if (!ok3d) return;
+  while (world.lesson.children.length) {
+    const o = world.lesson.children.pop();
+    o.traverse(n => { if (n.geometry && n.geometry !== world.ballGeo && n.geometry !== world.shadowGeo && n.geometry !== world.ringGeo) n.geometry.dispose(); });
+  }
+  $('tags').innerHTML = '';
+}
+
+function select(id, keepHash) {
+  const l = LESSONS.find(x => x.id === id) || LESSONS[0];
+  current = l;
+  const lv = LEVELS.find(v => v.id === l.level);
+  const idx = LESSONS.indexOf(l);
+  $('lEyebrow').innerHTML = `Level ${lv.id} · ${lv.name} · ${lv.diff} <span class="diff" aria-label="Difficulty ${lv.id} of 7">${LEVELS.map(v => `<i class="${v.id <= lv.id ? 'on' : ''}"></i>`).join('')}</span> · Lesson ${idx + 1} of ${LESSONS.length}`;
+  $('lTitle').textContent = l.title; $('lLede').textContent = l.lede;
+  $('sumLevel').textContent = `L${lv.id} ${lv.name}`; $('sumTitle').textContent = l.title;
+  $('lPoints').innerHTML = l.points.map(([k, v]) => `<li><span class="k">${k}</span><span class="v">${v}</span></li>`).join('');
+  $('lMistake').innerHTML = `<b>Common mistake</b>${l.mistake}`;
+  $('lDrill').innerHTML = `<b>Practice drill</b>${l.drill || ''}`; $('lDrill').hidden = !l.drill;
+  $('prevBtn').disabled = idx === 0;
+  $('nextBtn').disabled = idx === LESSONS.length - 1;
+  updateLearnBtn();
+  $('boardSlot').innerHTML = ''; if (l.scoreboard) mountBoard();
+  markCurrent();
+  if (!keepHash) { try { history.replaceState(null, '', '#' + l.id); } catch (e) {} }
+  store.set('ttm-last', l.id);
+
+  const specs = l.shots.map((s, i) => ({ ...s, v0: (SOLVED[l.id] || [])[i] }));
+  tracks = buildTracks(specs);
+  loopLen = Math.max(...tracks.map(t => t.end)) + 0.9;
+  simT = -LEAD;
+  $('legend').innerHTML = tracks.map(t => {
+    const s = t.spec.spin, parts = [];
+    if (s.top) parts.push(`${Math.abs(s.top)} ${s.top > 0 ? 'top' : 'back'}`);
+    if (s.side) parts.push(`${Math.abs(s.side)} side`);
+    return `<span><i style="background:${t.color}"></i>${t.label}${parts.length && !/rpm/.test(t.label) ? ` <span style="opacity:.6">· ${parts.join(' + ')} rpm</span>` : ''}</span>`;
+  }).join('');
+  buildVisuals();
+  setView(l.view, false);
+  render(true);
+}
+
+function buildVisuals() {
+  clearLesson(); visuals = [];
+  if (!ok3d) return;
+  tracks.forEach((t, i) => {
+    const col = new THREE.Color(t.color);
+    const ball = new THREE.Mesh(world.ballGeo, new THREE.MeshLambertMaterial({ map: world.ballTex, color: i === 0 || t.spec.compare ? '#ffffff' : '#ffffff' }));
+    const tint = new THREE.Mesh(new THREE.SphereGeometry(TT.R * BALL_SCALE * 1.02, 20, 14), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.28 }));
+    ball.add(tint);
+    const shadow = new THREE.Mesh(world.shadowGeo, new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.35, depthWrite: false }));
+    shadow.rotation.x = -Math.PI / 2;
+    // trail
+    const pts = new Float32Array(t.frames.length * 3);
+    t.frames.forEach((f, k) => { pts[k * 3] = f.p[0]; pts[k * 3 + 1] = f.p[1]; pts[k * 3 + 2] = f.p[2]; });
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+    const trail = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.85 }));
+    trail.frustumCulled = false;
+    const rings = t.events.filter(e => e.type === 'bounce' || e.type === 'net').map(e => {
+      const m = new THREE.Mesh(world.ringGeo, new THREE.MeshBasicMaterial({ color: e.type === 'net' ? '#ffffff' : col, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+      if (e.type === 'net') { m.rotation.y = Math.PI / 2; m.position.set(0.004, e.p[1], e.p[2]); }
+      else { m.rotation.x = -Math.PI / 2; m.position.set(e.p[0], TT.TABLE_Y + 0.003, e.p[2]); }
+      m.userData.t = e.t; world.lesson.add(m); return m;
+    });
+    const glyph = makeSpinGlyph();
+    const spinTag = document.createElement('div'); spinTag.className = 'tag3d spin-tag'; spinTag.style.borderColor = t.color; $('tags').appendChild(spinTag);
+    // racket: a stroke-specific swing that meets the ball exactly at contact
+    const paddle = makePaddle('#c8262e');
+    const S = makeSwing(t);
+    paddle.userData = S;
+    const pathPts = [];
+    for (let k = 0; k <= 32; k++) pathPts.push(S.P(-1 + k / 16, new THREE.Vector3()));
+    const swingPath = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pathPts), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.35 }));
+    world.lesson.add(swingPath);
+    world.lesson.add(trail, ball, shadow, glyph.g, paddle);
+    visuals.push({ ball, shadow, trail, rings, glyph, spinTag, paddle, swingPath, quat: new THREE.Quaternion(), lastT: 0 });
+  });
+  buildPlayers();
+  // labels
+  (current.labels || []).forEach(lb => {
+    const el = document.createElement('div'); el.className = 'tag3d'; el.textContent = lb.t;
+    el.dataset.p = JSON.stringify(lb.p); $('tags').appendChild(el);
+  });
+}
+
+function sample(track, t) {
+  const fr = track.frames;
+  if (t <= fr[0].t) return fr[0];
+  if (t >= fr[fr.length - 1].t) return fr[fr.length - 1];
+  let lo = 0, hi = fr.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (fr[m].t <= t) lo = m; else hi = m; }
+  const a = fr[lo], b = fr[hi], k = (t - a.t) / (b.t - a.t || 1);
+  return { t, p: [0, 1, 2].map(i => a.p[i] + (b.p[i] - a.p[i]) * k), v: b.v, w: b.w, toss: a.toss, idx: lo };
+}
+
+const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), proj = new THREE.Vector3();
+let lastCaption = '';
+function render(force) {
+  if (!ok3d) { updateReadout(null); return; }
+  let active = null;
+  tracks.forEach((t, i) => {
+    const vis = visuals[i];
+    const handed = t.spec !== undefined && tracks.some(o => o.spec.after === i);
+    const visible = (simT >= t.start || ((!!t.spec.toss || (t.drop && t.start < t.hitT)) && t.spec.after === undefined)) && (!handed || simT <= t.end);
+    const preHidden = t.spec.after !== undefined && simT < t.start;
+    const f = sample(t, simT);
+    vis.ball.visible = !!(visible && !preHidden);
+    vis.ball.position.set(...f.p);
+    // spin rotation (slowed for display)
+    const dt = simT - vis.lastT; vis.lastT = simT;
+    if (!f.toss && Math.abs(dt) < 0.2) {
+      const w = tmpV.set(...f.w); const mag = w.length();
+      if (mag > 1) { tmpQ.setFromAxisAngle(w.normalize(), mag * dt * SPIN_SHOW); vis.ball.quaternion.premultiply(tmpQ); }
+    }
+    const h = f.p[1] - TT.TABLE_Y;
+    const overTable = Math.abs(f.p[0]) <= TT.HALF_L && Math.abs(f.p[2]) <= TT.HALF_W;
+    vis.shadow.visible = vis.ball.visible;
+    vis.shadow.position.set(f.p[0], overTable ? TT.TABLE_Y + 0.002 : 0.004, f.p[2]);
+    vis.shadow.material.opacity = Math.max(0.08, 0.45 - (overTable ? h : f.p[1]) * 0.6);
+    // trail
+    const n = simT < t.frames[0].t ? 0 : (f.idx !== undefined ? f.idx + 1 : (simT >= t.end ? t.frames.length : 1));
+    vis.trail.geometry.setDrawRange(0, n);
+    vis.trail.visible = n > 1;
+    vis.rings.forEach(r => { const age = simT - r.userData.t; r.visible = age >= 0; if (age >= 0) { const s = 1 + Math.min(age, 0.25) * 3; r.scale.set(s, s, s); } });
+    // spin view
+    const w = new THREE.Vector3(...f.w), wl = w.length();
+    const showG = showAxis && vis.ball.visible && !f.toss && wl > 15;
+    vis.glyph.g.visible = showG;
+    if (showG) {
+      vis.glyph.g.position.set(...f.p);
+      vis.glyph.g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), w.clone().divideScalar(wl));
+      if (Math.abs(dt) < 0.2) vis.glyph.phase += wl * dt * SPIN_SHOW;
+      vis.glyph.turn.rotation.z = vis.glyph.phase;
+      vis.spinTag.textContent = spinName(f);
+    }
+    vis.spinTag.dataset.on = showG ? '1' : '';
+    vis.spinTag.dataset.p = JSON.stringify([f.p[0], f.p[1] + 0.13, f.p[2]]);
+    // racket swing
+    swingPose(vis.paddle.userData, simT - t.hitT, vis.paddle.position, vis.paddle.quaternion);
+    if (vis.ball.visible && simT >= t.start && simT <= t.end + 0.05) active = { t, f };
+  });
+  const look = active ? new THREE.Vector3(...active.f.p) : new THREE.Vector3(0, 0.85, 0);
+  (world.players || []).forEach(pl => updatePlayer(pl, look));
+  // net flash
+  const netHit = tracks.some(t => t.events.some(e => e.type === 'net' && simT >= e.t && simT < e.t + 0.25));
+  world.netMat.color.set(netHit ? '#ffd166' : '#0d1117'); world.netMat.opacity = netHit ? 0.85 : 0.55;
+
+  // camera
+  const k = force ? 1 : 0.08;
+  for (const key of ['theta', 'phi', 'r', 'tx', 'ty', 'tz']) {
+    let diff = camGoal[key] - cam[key];
+    if (key === 'theta') diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    cam[key] += diff * k;
+  }
+  camera.position.set(cam.tx + cam.r * Math.sin(cam.phi) * Math.sin(cam.theta), cam.ty + cam.r * Math.cos(cam.phi), cam.tz + cam.r * Math.sin(cam.phi) * Math.cos(cam.theta));
+  camera.lookAt(cam.tx, cam.ty, cam.tz);
+  renderer.render(scene, camera);
+
+  // labels
+  const W = stage.clientWidth, H = stage.clientHeight;
+  document.querySelectorAll('.tag3d').forEach(el => {
+    proj.set(...JSON.parse(el.dataset.p)).project(camera);
+    el.style.display = proj.z < 1 && (!el.classList.contains('spin-tag') || el.dataset.on) ? '' : 'none';
+    el.style.transform = `translate(${(proj.x * 0.5 + 0.5) * W}px, ${(-proj.y * 0.5 + 0.5) * H}px) translate(-50%, -50%)`;
+  });
+  updateReadout(active);
+  updateCaption();
+}
+
+function updateReadout(a) {
+  if (!a) return;
+  const { f } = a;
+  const sp = Math.hypot(...f.v) * 3.6, rpm = Math.hypot(...f.w) / TT.RPM, h = (f.p[1] - TT.TABLE_Y) * 100;
+  $('rSpeed').innerHTML = `${sp.toFixed(0)}<em>km/h</em>`;
+  $('rSpin').innerHTML = `${f.toss ? 0 : Math.round(rpm / 10) * 10}<em>rpm</em>`;
+  $('rHeight').innerHTML = `${h.toFixed(0)}<em>cm</em>`;
+  const hitter = (world.players || []).filter(p => p.active).sort((x, y) => Math.abs(simT - x.active.plan.hit) - Math.abs(simT - y.active.plan.hit))[0];
+  $('rRacket').innerHTML = `${hitter ? Math.round(Math.min(hitter.racketSpeed, 20) * 3.6) : 0}<em>km/h</em>`;
+}
+
+function updateCaption() {
+  let ev = null, who = null;
+  tracks.forEach(t => t.events.forEach(e => { if (e.t <= simT && (!ev || e.t > ev.t) && e.t <= (t.end + 0.01)) { ev = e; who = t; } }));
+  let txt = 'Drag to orbit · scroll or pinch to zoom';
+  if (ev && simT - ev.t < 0.6) {
+    const mine = who.from[0] < 0;
+    if (ev.type === 'toss') txt = ev.drop ? `${who.label}: tossed up from the free hand` : `${who.label}: open palm, toss straight up`;
+    else if (ev.type === 'bounce') {
+      const own = Math.sign(ev.p[0]) === Math.sign(who.from[0]);
+      txt = `${who.label}: bounce on ${own ? (mine ? 'your' : 'their own') : (mine ? 'opponent\'s' : 'your')} half`;
+    } else if (ev.type === 'net') txt = current.netCall || `${who.label}: net touch`;
+    else if (ev.type === 'floor') txt = `${who.label}: off the table`;
+    else if (ev.type === 'roll') txt = `${who.label}: the ball dies on the table`;
+  } else if (!ev || simT < 0.05) {
+    const srv = tracks.find(t => (t.spec.toss || t.drop) && t.spec.after === undefined);
+    txt = srv && simT < srv.start ? (srv.drop ? `${srv.label}: ball starts in the free hand` : `${srv.label}: ball rests still on the open palm, behind the end line`)
+      : simT < 0 ? 'Players get ready' : 'Drag to orbit · scroll or pinch to zoom';
+  }
+  if (txt !== lastCaption) { $('caption').textContent = txt; lastCaption = txt; }
+}
+
+/* ---------- loop ---------- */
+let lastNow = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastNow) / 1000); lastNow = now;
+  if (playing) { simT += dt * speed; if (simT > loopLen) { simT = -LEAD; visuals.forEach(v => v.lastT = -LEAD); } }
+  if (!scrubbing) $('scrub').value = Math.round((simT + LEAD) / (loopLen + LEAD) * 1000);
+  $('time').textContent = (simT + LEAD).toFixed(2) + 's';
+  if (ok3d) render(false);
+  requestAnimationFrame(frame);
+}
+
+function resize() {
+  if (!ok3d) return;
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h;
+  camera.fov = w / h < 1.1 ? 52 : 40; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+/* ---------- controls ---------- */
+function setPlaying(p) { playing = p; $('play').textContent = p ? '❚❚' : '▶'; $('play').setAttribute('aria-label', p ? 'Pause' : 'Play'); }
+$('play').addEventListener('click', () => setPlaying(!playing));
+let scrubbing = false;
+$('scrub').addEventListener('input', e => { scrubbing = true; simT = e.target.value / 1000 * (loopLen + LEAD) - LEAD; });
+$('scrub').addEventListener('change', () => { scrubbing = false; });
+$('speeds').addEventListener('click', e => {
+  const b = e.target.closest('[data-speed]'); if (!b) return;
+  speed = +b.dataset.speed;
+  document.querySelectorAll('#speeds .ctrl').forEach(x => x.setAttribute('aria-pressed', x === b));
+});
+$('views').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
+$('axisBtn').addEventListener('click', () => { showAxis = !showAxis; $('axisBtn').setAttribute('aria-pressed', showAxis); });
+
+// orbit
+const ptrs = new Map(); let pinch0 = 0;
+if (ok3d) {
+  const cv = renderer.domElement;
+  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); });
+  cv.addEventListener('pointermove', e => {
+    if (!ptrs.has(e.pointerId)) return;
+    const [px, py] = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    if (ptrs.size === 1) {
+      camGoal.theta -= (e.clientX - px) * 0.008;
+      camGoal.phi = THREE.MathUtils.clamp(camGoal.phi - (e.clientY - py) * 0.006, 0.05, 1.5);
+      Object.assign(cam, { theta: camGoal.theta, phi: camGoal.phi });
+      document.querySelectorAll('#views .ctrl').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    } else if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (pinch0) { camGoal.r = THREE.MathUtils.clamp(camGoal.r * pinch0 / d, 1.4, 12); cam.r = camGoal.r; }
+      pinch0 = d;
+    }
+  });
+  const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = 0; };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', e => { e.preventDefault(); camGoal.r = THREE.MathUtils.clamp(camGoal.r * (1 + e.deltaY * 0.001), 1.4, 12); }, { passive: false });
+}
+
+// lesson nav
+const step = d => { const i = LESSONS.indexOf(current) + d; if (LESSONS[i]) select(LESSONS[i].id); };
+$('prevBtn').addEventListener('click', () => step(-1));
+$('nextBtn').addEventListener('click', () => step(1));
+function updateLearnBtn() {
+  const done = learned.has(current.id);
+  $('learnBtn').textContent = done ? 'Learned ✓' : 'Mark as learned';
+  $('learnBtn').classList.toggle('learned', done);
+}
+$('learnBtn').addEventListener('click', () => {
+  learned.has(current.id) ? learned.delete(current.id) : learned.add(current.id);
+  store.set('ttm-learned', [...learned]); updateLearnBtn(); renderRail();
+});
+addEventListener('keydown', e => {
+  if (e.target.matches('input, button, select') && e.key === ' ') return;
+  if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
+  if (e.key === 'ArrowRight' && e.altKey) step(1);
+  if (e.key === 'ArrowLeft' && e.altKey) step(-1);
+});
+
+/* ---------- scoreboard (scoring lesson) ---------- */
+function mountBoard() {
+  const st = { a: 0, b: 0, first: 0 };
+  const el = document.createElement('div'); el.className = 'board';
+  el.innerHTML = `<div class="board-head"><span>Practise calling the score</span><button class="reset" id="bReset">New game</button></div>
+    <div class="board-row"><span class="serve-dot" id="sA"></span><span class="pname">You</span><span class="pts" id="pA">0</span><button class="add" id="addA">+1</button></div>
+    <div class="board-row"><span class="serve-dot" id="sB"></span><span class="pname">Opponent</span><span class="pts" id="pB">0</span><button class="add" id="addB">+1</button></div>
+    <div class="board-msg" id="bMsg"></div>`;
+  $('boardSlot').appendChild(el);
+  const upd = () => {
+    const p = st.a + st.b, deuce = st.a >= 10 && st.b >= 10;
+    const server = ((p < 20 ? Math.floor(p / 2) : p) + st.first) % 2;
+    const win = (st.a >= 11 || st.b >= 11) && Math.abs(st.a - st.b) >= 2 ? (st.a > st.b ? 'You' : 'Opponent') : null;
+    $('pA').textContent = st.a; $('pB').textContent = st.b;
+    $('sA').classList.toggle('on', !win && server === 0); $('sB').classList.toggle('on', !win && server === 1);
+    $('addA').disabled = $('addB').disabled = !!win;
+    let msg = `${server === 0 ? 'You serve' : 'Opponent serves'}. ` + (deuce ? 'Deuce rules: serve changes every point, win by 2.' : `${2 - (p % 2)} serve${p % 2 ? '' : 's'} left in this turn.`);
+    if (deuce && st.a === st.b) msg = `Deuce at ${st.a}–${st.b}. ${server === 0 ? 'You serve' : 'Opponent serves'}, one serve each from now on.`;
+    if (win) msg = `${win} ${win === 'You' ? 'win' : 'wins'} the game ${Math.max(st.a, st.b)}–${Math.min(st.a, st.b)}. Change ends.`;
+    $('bMsg').textContent = msg;
+  };
+  el.querySelector('#addA').onclick = () => { st.a++; upd(); };
+  el.querySelector('#addB').onclick = () => { st.b++; upd(); };
+  el.querySelector('#bReset').onclick = () => { st.a = st.b = 0; upd(); };
+  upd();
+}
+
+/* ---------- start ---------- */
+if (innerWidth <= 1040) $('rail').open = false;
+renderRail();
+const start = (location.hash || '').slice(1) || store.get('ttm-last', 'table');
+select(LESSONS.some(l => l.id === start) ? start : 'table', !location.hash);
+setView(current.view, true);
+setPlaying(playing);
+resize();
+requestAnimationFrame(frame);
+})();
+</script>
