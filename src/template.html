@@ -21,6 +21,7 @@
   --blue: #6ea2ec; --ball: #ff8a3d; --ok: #4cc58c; --chip: #1b2636; color-scheme: dark }
 
 * { box-sizing: border-box; }
+html, body { margin: 0; }
 body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--f-body); -webkit-font-smoothing: antialiased; }
 button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -60,7 +61,7 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 
 /* arena */
 .stage { background: var(--arena); border-radius: 16px; overflow: hidden; }
-.viewport { position: relative; aspect-ratio: 16 / 8.6; max-width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+.viewport { position: relative; aspect-ratio: 16 / 8.6; max-width: 100%; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .viewport canvas { display: block; width: 100%; height: 100%; cursor: grab; }
 .viewport canvas:active { cursor: grabbing; }
 .hud { position: absolute; color: var(--hud-ink); font-size: 12px; }
@@ -148,7 +149,25 @@ header.top { display: flex; align-items: center; justify-content: space-between;
   .legend { top: auto; bottom: 10px; left: 10px; right: auto; max-width: calc(100% - 20px); font-size: 11px; }
   .caption { top: 64px; bottom: auto; font-size: 12px; }
   .note { display: none; }
-  .scrub { order: 5; flex-basis: 100%; }
+  .controls { gap: 8px; padding: 10px; }
+  .controls .ctrl { height: 40px; min-width: 40px; font-size: 13px; }
+  .seg .ctrl { height: 36px; padding: 0 10px; font-size: 12.5px; }
+  .play { order: 0; width: 44px; }
+  .scrub { order: 1; flex: 1 1 calc(100% - 120px); min-width: 0; height: 40px; }
+  .time { order: 2; min-width: 46px; }
+  #speeds { order: 3; }
+  #zoom { order: 4; }
+  #axisBtn { order: 5; margin-left: auto; }
+  #views { order: 6; flex: 1 1 100%; display: flex; }
+  #views .ctrl { flex: 1 1 0; }
+  .eyebrow .diff { display: none; }
+  .eyebrow { font-size: 11px; line-height: 1.5; }
+  .lede { font-size: 16.5px; }
+  .nav-row { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 8px; }
+  .nav-row .btn { justify-content: center; text-align: center; min-height: 46px; padding: 8px 10px; font-size: 13.5px; }
+  .nav-row .btn .long { display: none; }
+  .lesson-btn { min-height: 44px; }
+  .board button.add { min-height: 44px; min-width: 52px; }
   .progress .ladder { display: none; }
   .points li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .brand h1 { font-size: 26px; }
@@ -206,6 +225,10 @@ header.top { display: flex; align-items: center; justify-content: space-between;
             <button class="ctrl" data-view="top">Top</button>
             <button class="ctrl" data-view="receiver">Receiver</button>
           </div>
+          <div class="seg" id="zoom" aria-label="Zoom">
+            <button class="ctrl" data-zoom="1.18" aria-label="Zoom out">−</button>
+            <button class="ctrl" data-zoom="0.85" aria-label="Zoom in">+</button>
+          </div>
           <button class="ctrl" id="axisBtn" aria-pressed="true" title="Show which way each ball spins and name the spin">Spin view</button>
         </div>
       </div>
@@ -216,9 +239,9 @@ header.top { display: flex; align-items: center; justify-content: space-between;
           <h2 id="lTitle"></h2>
           <p class="lede" id="lLede"></p>
           <div class="nav-row">
-            <button class="btn" id="prevBtn">← Previous</button>
+            <button class="btn" id="prevBtn">← Prev<span class="long">ious</span></button>
             <button class="btn" id="learnBtn">Mark as learned</button>
-            <button class="btn primary" id="nextBtn">Next lesson →</button>
+            <button class="btn primary" id="nextBtn">Next<span class="long"> lesson</span> →</button>
           </div>
           <div class="mistake" id="lMistake"></div>
           <div class="drill" id="lDrill"></div>
@@ -543,10 +566,13 @@ const cam = { theta: 0, phi: 1, r: 4, tx: 0, ty: 0.8, tz: 0 }, camGoal = { ...ca
 const VIEWS = {
   broadcast: [-4.0, 3.0, 1.4], side: [0.15, 1.5, 4.3], top: [0, 5.6, 0.4], receiver: [4.0, 3.0, -1.4],
 };
+let curView = 'side', userCam = false;
 function setView(name, snap) {
+  curView = name; userCam = false;
   const [x, y, z] = VIEWS[name];
   const dx = x - 0, dy = y - 0.8, dz = z - 0, r = Math.hypot(dx, dy, dz);
-  const fit = name === 'top' ? 1 : Math.max(1, (world.extent || 0) / 2.7);
+  const asp = stage.clientWidth / Math.max(stage.clientHeight, 1);
+  const fit = (name === 'top' ? 1 : Math.max(1, (world.extent || 0) / 2.7)) * (asp < 1.5 ? Math.pow(1.5 / asp, 0.7) : 1);
   Object.assign(camGoal, { r: r * fit, phi: Math.acos(dy / r), theta: Math.atan2(dx, dz), tx: 0, ty: 0.8, tz: 0 });
   if (snap) Object.assign(cam, camGoal);
   document.querySelectorAll('#views .ctrl').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === name));
@@ -769,7 +795,8 @@ function resize() {
   if (!ok3d) return;
   const w = stage.clientWidth, h = stage.clientHeight;
   renderer.setSize(w, h, false); camera.aspect = w / h;
-  camera.fov = w / h < 1.1 ? 52 : 40; camera.updateProjectionMatrix();
+  camera.fov = w / h < 1.1 ? 50 : 40; camera.updateProjectionMatrix();
+  if (current && !userCam) setView(curView, true);
 }
 new ResizeObserver(resize).observe(stage);
 
@@ -785,6 +812,7 @@ $('speeds').addEventListener('click', e => {
   document.querySelectorAll('#speeds .ctrl').forEach(x => x.setAttribute('aria-pressed', x === b));
 });
 $('views').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
+$('zoom').addEventListener('click', e => { const b = e.target.closest('[data-zoom]'); if (b) { camGoal.r = THREE.MathUtils.clamp(camGoal.r * +b.dataset.zoom, 1.4, 14); userCam = true; } });
 $('axisBtn').addEventListener('click', () => { showAxis = !showAxis; $('axisBtn').setAttribute('aria-pressed', showAxis); });
 
 // orbit
@@ -797,18 +825,19 @@ if (ok3d) {
     const [px, py] = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
     if (ptrs.size === 1) {
       camGoal.theta -= (e.clientX - px) * 0.008;
-      camGoal.phi = THREE.MathUtils.clamp(camGoal.phi - (e.clientY - py) * 0.006, 0.05, 1.5);
+      if (e.pointerType !== 'touch') camGoal.phi = THREE.MathUtils.clamp(camGoal.phi - (e.clientY - py) * 0.006, 0.05, 1.5);
+      userCam = true;
       Object.assign(cam, { theta: camGoal.theta, phi: camGoal.phi });
       document.querySelectorAll('#views .ctrl').forEach(b => b.setAttribute('aria-pressed', 'false'));
     } else if (ptrs.size === 2) {
       const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      if (pinch0) { camGoal.r = THREE.MathUtils.clamp(camGoal.r * pinch0 / d, 1.4, 12); cam.r = camGoal.r; }
+      if (pinch0) { camGoal.r = THREE.MathUtils.clamp(camGoal.r * pinch0 / d, 1.4, 14); cam.r = camGoal.r; userCam = true; }
       pinch0 = d;
     }
   });
   const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = 0; };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  cv.addEventListener('wheel', e => { e.preventDefault(); camGoal.r = THREE.MathUtils.clamp(camGoal.r * (1 + e.deltaY * 0.001), 1.4, 12); }, { passive: false });
+  cv.addEventListener('wheel', e => { e.preventDefault(); camGoal.r = THREE.MathUtils.clamp(camGoal.r * (1 + e.deltaY * 0.001), 1.4, 14); userCam = true; }, { passive: false });
 }
 
 // lesson nav
